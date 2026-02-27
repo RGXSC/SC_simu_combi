@@ -6,7 +6,7 @@ Deploy on Streamlit Cloud or run locally.
 import streamlit as st
 import numpy as np
 import pandas as pd
-import time, os, sys, itertools, multiprocessing as mp, warnings, base64, io
+import time, os, sys, itertools, warnings, base64, io
 warnings.filterwarnings('ignore')
 
 import matplotlib; matplotlib.use('Agg')
@@ -90,27 +90,16 @@ def run_batch(params, progress_bar, status_text):
     all_jobs = generate_jobs(params)
     total = len(all_jobs)
     status_text.text(f"⏳ {total:,.0f} jobs...")
-    nc = mp.cpu_count(); nw = max(1, nc-1)
-    cs = max(1, total // (nw*4))
+    cs = max(1, total // 50)  # 50 chunks for progress updates
     job_chunks = [all_jobs[i:i+cs] for i in range(0, total, cs)]
     progress_bar.progress(0.02); t0 = time.time()
     all_results = []
-    try:
-        ctx = mp.get_context('fork') if sys.platform != 'win32' else mp.get_context('spawn')
-        with ctx.Pool(processes=nw) as pool:
-            for cr in pool.imap_unordered(worker_chunk, job_chunks):
-                all_results.extend(cr)
-                done = len(all_results); pct = done/total; el = time.time()-t0
-                eta = (el/pct*(1-pct)) if pct > 0.05 else 0
-                progress_bar.progress(min(pct,0.99))
-                status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.1%}) — {el:.0f}s — ETA {eta:.0f}s — {nw}w")
-    except Exception:
-        all_results = []
-        for ch in job_chunks:
-            all_results.extend(worker_chunk(ch))
-            done = len(all_results); pct = done/total; el = time.time()-t0
-            progress_bar.progress(min(pct,0.99))
-            status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.1%}) — {el:.0f}s — 1 thread")
+    for ch in job_chunks:
+        all_results.extend(worker_chunk(ch))
+        done = len(all_results); pct = done/total; el = time.time()-t0
+        eta = (el/pct*(1-pct)) if pct > 0.05 else 0
+        progress_bar.progress(min(pct,0.99))
+        status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.1%}) — {el:.0f}s — ETA {eta:.0f}s")
     progress_bar.progress(1.0); el = time.time()-t0
     status_text.text(f"✅ {len(all_results):,.0f} sims — {el:.0f}s ({el/60:.1f}min) — {len(all_results)/max(el,0.1):,.0f}/s")
     df = pd.DataFrame(np.array(all_results, dtype=np.float32), columns=PHYS_COLS)
@@ -162,7 +151,7 @@ def run_analysis(df_full):
     pretty_names = [PRETTY.get(f,f) for f in ML_FEATURES]
     tree = DecisionTreeRegressor(max_depth=4, min_samples_leaf=500, random_state=42)
     tree.fit(X,y,sample_weight=w)
-    rf = RandomForestRegressor(n_estimators=100,max_depth=8,min_samples_leaf=200,random_state=42,n_jobs=-1)
+    rf = RandomForestRegressor(n_estimators=100,max_depth=8,min_samples_leaf=200,random_state=42,n_jobs=1)
     rf.fit(X,y,sample_weight=w)
     corr = {f: np.corrcoef(X[:,i],y)[0,1] for i,f in enumerate(ML_FEATURES)}
     fig,ax = plt.subplots(figsize=(28,12),dpi=100)
@@ -396,7 +385,7 @@ with st.sidebar:
     st.subheader("📈 Demand Profile")
     dm_min = st.number_input("Min demand ×",value=0.30,step=0.05,format="%.2f")
     dm_max = st.number_input("Max demand ×",value=4.00,step=0.10,format="%.2f")
-    dm_step = st.number_input("Step",value=0.10,step=0.05,format="%.2f",key="dms")
+    dm_step = st.number_input("Step",value=0.30,step=0.05,format="%.2f",key="dms")
     demand_mults = [round(dm_min+i*dm_step,2) for i in range(int((dm_max-dm_min)/dm_step)+1)]
     demand_mults = [d for d in demand_mults if d<=dm_max+0.001]
     sigma = st.slider("σ (uncertainty spread)",0.1,1.5,0.6,0.05)
@@ -437,10 +426,10 @@ with st.sidebar:
             lt_configs[stage]=list(range(lmin,lmax+1,lstp))
             st.caption(f"→ {lt_configs[stage]}")
     lt_combos=list(itertools.product(lt_configs["Raw Material"],lt_configs["Semi-Finished"],lt_configs["Finished Product"],lt_configs["Distribution"]))
-    if len(lt_combos)>200:
-        rng=np.random.RandomState(42); idx=rng.choice(len(lt_combos),200,replace=False)
+    if len(lt_combos)>50:
+        rng=np.random.RandomState(42); idx=rng.choice(len(lt_combos),50,replace=False)
         lt_combos=[lt_combos[i] for i in sorted(idx)]
-        st.warning(f"Sampled 200 LT combos")
+        st.warning(f"Sampled 50 LT combos for performance")
     st.caption(f"**{len(lt_combos)}** LT combinations")
 
     st.subheader("📦 Initial Stock (absolute)")
@@ -456,7 +445,7 @@ with st.sidebar:
         st.markdown("**🏪 Stores**")
         sd_st_min=st.number_input("Min %",value=30,step=10,key="sd_st_min")
         sd_st_max=st.number_input("Max %",value=100,step=10,key="sd_st_max")
-        sd_st_stp=st.number_input("Step %",value=10,step=5,key="sd_st_stp")
+        sd_st_stp=st.number_input("Step %",value=20,step=5,key="sd_st_stp")
     with sd_c2:
         st.markdown("**🏭 Warehouse**")
         sd_wh_min=st.number_input("Min %",value=0,step=10,key="sd_wh_min")
@@ -507,12 +496,15 @@ params={'demand_mults':demand_mults,'sim_weeks':sim_weeks,'plan_freqs':pf,'cap_r
     'stock_distribs':stock_distribs,'cap_start':cap_start,'base_forecast':base_forecast,'demand_splits':demand_splits}
 n_phys=(len(demand_mults)*len(sim_weeks)*len(pf)*len(cap_ramps)*len(smart_opts)*len(lt_combos)*len(stock_levels)*len(stock_distribs)*len(demand_splits))
 n_fin=n_phys*len(fixed_pcts)
-nc=mp.cpu_count(); nw=max(1,nc-1); est=n_phys*65e-6/60/nw
+est=n_phys*65e-6/60
+
+if n_phys > 5_000_000:
+    st.warning(f"⚠️ {n_phys:,.0f} sims may take >10 min on Streamlit Cloud. Increase step sizes to reduce.")
 
 st.info(f"""
 **{n_phys:,.0f}** physical sims × {len(fixed_pcts)} costs = **{n_fin:,.0f}** scenarios  
 📈 Center **{center:.0%}**, σ={sigma}, expected={sum(d*w for d,w in zip(demand_mults,weights)):.2f}×  
-🖥️ {nc} cores → ~**{max(1,est):.0f} min**
+⏱️ Estimated ~**{max(1,est):.0f} min**
 """)
 
 # ════════════════════════════════════════════════════════════════
