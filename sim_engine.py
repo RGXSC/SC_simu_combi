@@ -23,6 +23,7 @@ def sim_fast(weeks, init_sa, init_sb, init_cw, init_semi, init_rm,
     rm = float(init_rm); sm = float(init_semi); cw = float(init_cw)
     pb = 0.0; scap = cap_start+0.0; smcap = cap_start+0.0; fcap = cap_start+0.0
     sa_ = False; sma_ = False; fa_ = False
+    sn = 0; smn = 0; fn = 0  # week counters for linear ramp
     co = 0.0; cas = 0.0; cov = mat_lt + semi_lt + fp_lt + dist_lt + order_freq
     ts = 0.0; tm_ = 0.0; td = 0.0; tp = 0.0; so = 0; ma_ = 0.0; mb_ = 0.0
     bf = base_forecast; cs = float(cap_start); cr = cap_ramp; mx = cs * 10
@@ -49,21 +50,21 @@ def sim_fast(weeks, init_sa, init_sb, init_cw, init_semi, init_rm,
         ts += s_a + s_b; tm_ += m_a + m_b; td += dem; ma_ += m_a; mb_ += m_b
         if m_a + m_b > 0.5: so += 1
         if pb > 0.01:
-            if not sa_: sa_ = True; scap = cs
-            else: scap = _min(scap*(1+cr), mx)
+            if not sa_: sa_ = True; sn = 0; scap = cs
+            else: sn += 1; scap = _min(cs*(1+sn*cr), mx)
             sh = _ceil(_min(pb, scap)); pb -= sh
-        else: sh = 0; sa_ = False; scap = cs
+        else: sh = 0; sa_ = False; sn = 0; scap = cs
         rm += mar; sm += sar; cw += far
         if rm > 0.01:
-            if not sma_: sma_ = True; smcap = cs
-            else: smcap = _min(smcap*(1+cr), mx)
+            if not sma_: sma_ = True; smn = 0; smcap = cs
+            else: smn += 1; smcap = _min(cs*(1+smn*cr), mx)
             si = _ceil(_min(rm, smcap)); rm -= si
-        else: si = 0; sma_ = False; smcap = cs
+        else: si = 0; sma_ = False; smn = 0; smcap = cs
         if sm > 0.01:
-            if not fa_: fa_ = True; fcap = cs
-            else: fcap = _min(fcap*(1+cr), mx)
+            if not fa_: fa_ = True; fn = 0; fcap = cs
+            else: fn += 1; fcap = _min(cs*(1+fn*cr), mx)
             fi = _ceil(_min(sm, fcap)); sm -= fi
-        else: fi = 0; fa_ = False; fcap = cs
+        else: fi = 0; fa_ = False; fn = 0; fcap = cs
         tp += fi
         ship = _ceil(cw) if cw > 0.01 else 0; cw = 0.0
         if smart_distrib and ship > 0:
