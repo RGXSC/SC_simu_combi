@@ -992,22 +992,13 @@ SC Agility Batch Simulator v4 · Generated {time.strftime('%Y-%m-%d %H:%M')}
 </body></html>"""
 
     try:
-        p1 = os.path.join(OUTPUT_DIR, 'sc_physical_results.csv')
-        (df_phys.sample(min(1_000_000,len(df_phys)),random_state=42) if len(df_phys)>1_000_000 else df_phys).to_csv(p1, index=False)
-        p2 = os.path.join(OUTPUT_DIR, 'sc_financial_results.csv')
-        (df_full.sample(min(500_000,len(df_full)),random_state=42) if len(df_full)>500_000 else df_full).to_csv(p2, index=False)
-        p3 = os.path.join(OUTPUT_DIR, 'sc_executive_summary.md')
-        with open(p3,'w',encoding='utf-8') as f:
-            f.write(f"# SC Agility — Executive Summary\n\n*{time.strftime('%Y-%m-%d %H:%M')}*\n\n{ex}")
-        p4 = os.path.join(OUTPUT_DIR, 'regression_tree.png')
-        analysis['tree_fig'].savefig(p4, dpi=150, bbox_inches='tight')
-        p5 = os.path.join(OUTPUT_DIR, 'sc_results_report.html')
-        with open(p5, 'w', encoding='utf-8') as f:
-            f.write(html)
-        st.success(f"✅ Exported to **{OUTPUT_DIR}/**")
-        st.caption(f"📄 **HTML report:** {p5}")
-        st.caption(f"📊 CSVs: {p1}, {p2}")
-        st.caption(f"📋 Summary: {p3} · 🌳 Tree: {p4}")
+        # Download buttons (no file system needed)
+        st.download_button("📄 Download HTML Report", html, "sc_results_report.html", "text/html")
+
+        csv_fin = df_full.sample(min(500_000, len(df_full)), random_state=42).to_csv(index=False) if len(df_full) > 500_000 else df_full.to_csv(index=False)
+        st.download_button("📊 Download Financial CSV", csv_fin, "sc_financial_results.csv", "text/csv")
+
+        st.download_button("📋 Download Executive Summary", f"# SC Agility — Executive Summary\n\n*{time.strftime('%Y-%m-%d %H:%M')}*\n\n{ex}", "sc_executive_summary.md", "text/markdown")
     except Exception as e:
         st.error(f"Export failed: {e}")
 
