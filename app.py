@@ -5,7 +5,7 @@ import time
 import os
 import sys
 import itertools
-import multiprocessing as mp
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -129,32 +129,20 @@ def generate_jobs(params):
 def run_batch(params, progress_bar, status_text):
     all_jobs = generate_jobs(params)
     total = len(all_jobs)
+    if total == 0:
+        status_text.text("No jobs")
+        return pd.DataFrame(columns=PHYS_COLS)
     status_text.text(f"⏳ {total:,.0f} jobs...")
-
-    nc = mp.cpu_count(); nw = max(1, nc-1)
-    cs = max(1, total // (nw*4))
+    cs = max(1, total // 50)
     job_chunks = [all_jobs[i:i+cs] for i in range(0, total, cs)]
     progress_bar.progress(0.02); t0 = time.time()
-    all_results = []; use_mp = True
-
-    try:
-        ctx = mp.get_context('fork') if sys.platform != 'win32' else mp.get_context('spawn')
-        with ctx.Pool(processes=nw) as pool:
-            for cr in pool.imap_unordered(worker_chunk, job_chunks):
-                all_results.extend(cr)
-                done = len(all_results); pct = done/total; el = time.time()-t0
-                eta = (el/pct*(1-pct)) if pct > 0.05 else 0
-                progress_bar.progress(min(pct,0.99))
-                status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.1%}) — {el:.0f}s — ETA {eta:.0f}s — {nw}w — {done/max(el,0.1):,.0f}/s")
-    except Exception as e:
-        use_mp = False; all_results = []
-        for ch in job_chunks:
-            all_results.extend(worker_chunk(ch))
-            done = len(all_results); pct = done/total; el = time.time()-t0
-            eta = (el/pct*(1-pct)) if pct > 0.05 else 0
-            progress_bar.progress(min(pct,0.99))
-            status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.1%}) — {el:.0f}s — ETA {eta:.0f}s — 1t")
-
+    all_results = []
+    for ch in job_chunks:
+        all_results.extend(worker_chunk(ch))
+        done = len(all_results); pct = done/total; el = time.time()-t0
+        eta = (el/pct*(1-pct)) if pct > 0.05 else 0
+        progress_bar.progress(min(pct,0.99))
+        status_text.text(f"⏳ {done:,.0f}/{total:,.0f} ({pct:.0%}) — {el:.0f}s — ETA {eta:.0f}s")
     progress_bar.progress(1.0); el = time.time()-t0
     status_text.text(f"✅ {len(all_results):,.0f} sims — {el:.0f}s ({el/60:.1f}min) — {len(all_results)/max(el,0.1):,.0f}/s")
 
@@ -239,7 +227,7 @@ def run_analysis(df_full):
     tree.fit(X, y, sample_weight=w)
 
     rf = RandomForestRegressor(n_estimators=100, max_depth=8, min_samples_leaf=200,
-                               random_state=42, n_jobs=-1)
+                               random_state=42, n_jobs=1)
     rf.fit(X, y, sample_weight=w)
 
     corr = {f: np.corrcoef(X[:, i], y)[0, 1] for i, f in enumerate(ML_FEATURES)}
@@ -505,13 +493,15 @@ n_phys = (len(demand_mults) * len(sim_weeks) * len(pf) * len(cap_ramps)
           * len(smart_opts) * len(lt_combos) * len(stock_levels)
           * len(stock_distribs) * len(demand_splits))
 n_fin = n_phys * len(fixed_pcts)
-nc = mp.cpu_count(); nw = max(1, nc-1)
-est = n_phys * 65e-6 / 60 / nw
+est = n_phys * 65e-6 / 60
+
+if n_phys > 5_000_000:
+    st.warning(f"⚠️ {n_phys:,.0f} sims — may be slow. Increase step sizes to reduce.")
 
 st.info(f"""
 **{n_phys:,.0f}** physical sims × {len(fixed_pcts)} fixed costs = **{n_fin:,.0f}** financial scenarios  
-💰 €{price} price · €{var_cost} var cost · Stock: {stock_levels} · {len(stock_distribs)} distributions · Splits A: {demand_splits}%  
-📈 Demand: center **{center:.0%}**, σ={sigma}, expected={sum(d*w for d,w in zip(demand_mults,weights)):.2f}× · 🖥️ {nc} cores → ~**{max(1,est):.0f} min**
+💰 €{price} price · €{var_cost} var cost · Stock: {stk_info} · {len(stock_distribs)} distributions · Splits A: {demand_splits}%  
+📈 Demand: center **{center:.0%}**, σ={sigma}, expected={sum(d*w for d,w in zip(demand_mults,weights)):.2f}× · ⏱️ ~**{max(1,est):.0f} min**
 """)
 
 
