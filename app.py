@@ -415,7 +415,7 @@ with st.sidebar:
     stk_min = st.number_input("Min stock", value=500, step=100)
     stk_max = st.number_input("Max stock", value=2500, step=100)
     stk_stp = st.number_input("Step", value=500, step=100, key="stk_s")
-    stock_levels = list(range(stk_min, stk_max+1, stk_stp))
+    stock_levels = list(range(stk_min, stk_max+1, max(1,stk_stp)))
     bf = max(base_forecast, 1)
     stk_info = ", ".join(f"{s} ({s/bf:.0f}wks)" for s in stock_levels)
     st.caption(f"Levels: {stk_info}")
@@ -447,7 +447,7 @@ with st.sidebar:
 
     with st.expander(f"📋 {len(stock_distribs)} distribution combos", expanded=False):
         sd_df = pd.DataFrame(stock_distribs, columns=['Stores %','Warehouse %','Semi %','Raw Mat %'])
-        st.dataframe(sd_df, hide_index=True, use_container_width=True, height=200)
+        st.dataframe(sd_df, hide_index=True, width='stretch', height=200)
     if len(stock_distribs) == 0:
         st.error("⚠️ No valid combos! Store + Warehouse + Semi must ≤ 100%")
         stock_distribs = [(100, 0, 0, 0)]
@@ -463,14 +463,14 @@ with st.sidebar:
     cr_min = st.number_input("Min ramp %/wk", value=5, step=5)
     cr_max = st.number_input("Max ramp %/wk", value=25, step=5)
     cr_stp = st.number_input("Ramp step %", value=10, step=5, key="cr_s")
-    cap_ramps = [r/100 for r in range(cr_min, cr_max+1, cr_stp)]
+    cap_ramps = [r/100 for r in range(cr_min, cr_max+1, max(1,cr_stp))]
     cap_start = st.number_input("Initial capacity/wk", value=100, step=25)
 
     st.subheader("📊 Fixed costs")
     fx_min = st.number_input("Min fixed %", value=20, step=5)
     fx_max = st.number_input("Max fixed %", value=60, step=5)
     fx_stp = st.number_input("Fixed step %", value=10, step=5, key="fx_s")
-    fixed_pcts = [f/100 for f in range(fx_min, fx_max+1, fx_stp)]
+    fixed_pcts = [f/100 for f in range(fx_min, fx_max+1, max(1,fx_stp))]
 
     st.subheader("🧠 Distribution")
     smart_opts = []
@@ -578,7 +578,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
     st.dataframe(imp_df.style.format({
         'Tree Importance': '{:.3f}', 'Forest Importance': '{:.3f}', 'Correlation': '{:+.3f}'
     }).bar(subset=['Forest Importance'], color='#4a90d9'),
-        hide_index=True, use_container_width=True)
+        hide_index=True, width='stretch')
 
     # ─── 2×2 STRATEGY MATRIX ───
     st.subheader("⚔️ Strategy Matrix: Stock Position × Supply Chain Speed")
@@ -600,7 +600,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
         fmt_matrix['Avg Total LT (wks)'] = fmt_matrix['Avg Total LT (wks)'].map(lambda x: f"{x:.0f}")
     if 'Avg % in Stores' in fmt_matrix.columns:
         fmt_matrix['Avg % in Stores'] = fmt_matrix['Avg % in Stores'].map(lambda x: f"{x:.0f}%")
-    st.dataframe(fmt_matrix, use_container_width=True)
+    st.dataframe(fmt_matrix, width='stretch')
 
     # ─── HEAD-TO-HEAD ───
     st.subheader("🏆 Head-to-Head: Push to Store+Slow vs Spread along SC+Fast")
@@ -629,7 +629,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                         'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_stk).set_index('Initial Stock (units)').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), use_container_width=True)
+    }), width='stretch')
 
     st.subheader("📊 Net Margin by % Stock in Stores")
     by_sp = []
@@ -641,7 +641,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                        'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_sp).set_index('% in Stores').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), use_container_width=True)
+    }), width='stretch')
 
     if df_full['pct_in_warehouse'].nunique() > 1:
         st.subheader("📊 Net Margin by % Stock in Warehouse")
@@ -654,7 +654,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
         st.dataframe(pd.DataFrame(by_wh).set_index('% in Warehouse').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-        }), use_container_width=True)
+        }), width='stretch')
 
     if df_full['pct_in_semifinished'].nunique() > 1:
         st.subheader("📊 Net Margin by % Stock in Semi-Finished")
@@ -667,7 +667,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
         st.dataframe(pd.DataFrame(by_se).set_index('% in Semi-Finished').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-        }), use_container_width=True)
+        }), width='stretch')
 
     st.subheader("📊 Net Margin by Total Lead Time")
     by_lt = []
@@ -679,7 +679,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                        'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_lt).set_index('Total Lead Time (wks)').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), use_container_width=True)
+    }), width='stretch')
 
     if len(demand_splits) > 1:
         st.subheader("📊 Net Margin by Demand Split (Store A %)")
@@ -691,7 +691,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Service Level': weighted_mean(g, 'service_level')})
         st.dataframe(pd.DataFrame(by_ds).set_index('Store A Demand %').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}'
-        }), use_container_width=True)
+        }), width='stretch')
 
     # ════════════════════════════════════════════════════════════
     # EXECUTIVE SUMMARY
