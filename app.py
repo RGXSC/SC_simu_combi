@@ -540,9 +540,42 @@ if st.button("🚀 Run All Simulations", type="primary"):
     tt = time.time()-t0
     st.success(f"🏁 **Done in {tt:.0f}s ({tt/60:.1f} min)**")
 
-    # ════════════════════════════════════════════════════════════
-    # RESULTS
-    # ════════════════════════════════════════════════════════════
+    # Store everything in session_state so it survives reruns
+    # Convert tree figure to PNG bytes (matplotlib figures don't survive session_state well)
+    import io as _io
+    _tree_buf = _io.BytesIO()
+    analysis['tree_fig'].savefig(_tree_buf, format='png', dpi=120, bbox_inches='tight')
+    _tree_png = _tree_buf.getvalue()
+    _tree_buf.close()
+    plt.close(analysis['tree_fig'])
+
+    st.session_state.sim_results = {
+        'df_full': df_full, 'df_phys': df_phys, 'analysis': analysis,
+        'tree_png': _tree_png,
+        'matrix_df': matrix_df, 'pairs': pairs, 'smart': smart,
+        'median_lt': median_lt, 'weights': weights, 'demand_mults': demand_mults,
+        'center': center, 'sigma': sigma, 'price': price, 'var_cost': var_cost,
+        'fixed_pcts': fixed_pcts, 'stock_levels': stock_levels,
+        'demand_splits': demand_splits, 'sim_weeks': sim_weeks,
+        'stock_distribs': stock_distribs, 'lt_combos': lt_combos,
+        'stk_info': stk_info, 'base_forecast': base_forecast,
+    }
+
+# ════════════════════════════════════════════════════════════════
+# DISPLAY RESULTS (from session_state — survives download reruns)
+# ════════════════════════════════════════════════════════════════
+if 'sim_results' in st.session_state:
+    R = st.session_state.sim_results
+    df_full = R['df_full']; analysis = R['analysis']; matrix_df = R['matrix_df']
+    pairs = R['pairs']; smart = R['smart']; median_lt = R['median_lt']
+    weights = R['weights']; demand_mults = R['demand_mults']
+    center = R['center']; sigma = R['sigma']
+    price = R['price']; var_cost = R['var_cost']
+    fixed_pcts = R['fixed_pcts']; stock_levels = R['stock_levels']
+    demand_splits = R['demand_splits']; sim_weeks = R['sim_weeks']
+    stock_distribs = R['stock_distribs']; lt_combos = R['lt_combos']
+    stk_info = R['stk_info']; base_forecast = R['base_forecast']
+
     st.divider()
     st.header("📈 Results (demand-weighted)")
 
@@ -554,8 +587,7 @@ if st.button("🚀 Run All Simulations", type="primary"):
 
     # ─── VISUAL REGRESSION TREE ───
     st.subheader("🌳 Decision Tree — What Drives Net Margin?")
-    st.pyplot(analysis['tree_fig'])
-    plt.close(analysis['tree_fig'])
+    st.image(R['tree_png'])
 
     with st.expander("📝 Tree Rules (text)"):
         st.code(analysis['tree_text'], language='text')
@@ -745,11 +777,8 @@ Weighted Δ margin: **{pairs['avg_delta']:+.1%}** in favor of {'Spread along SC+
     # Build standalone HTML report
     import base64, io
 
-    # Tree image as base64
-    buf = io.BytesIO()
-    analysis['tree_fig'].savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    tree_b64 = base64.b64encode(buf.getvalue()).decode()
-    buf.close()
+    # Tree image as base64 (from stored PNG)
+    tree_b64 = base64.b64encode(R['tree_png']).decode()
 
     # Demand chart as base64
     fig_dem, ax_dem = plt.subplots(figsize=(8, 2.5), dpi=100)
@@ -992,13 +1021,10 @@ SC Agility Batch Simulator v4 · Generated {time.strftime('%Y-%m-%d %H:%M')}
 </body></html>"""
 
     try:
-        # Download buttons (no file system needed)
         st.download_button("📄 Download HTML Report", html, "sc_results_report.html", "text/html")
 
         csv_fin = df_full.sample(min(500_000, len(df_full)), random_state=42).to_csv(index=False) if len(df_full) > 500_000 else df_full.to_csv(index=False)
         st.download_button("📊 Download Financial CSV", csv_fin, "sc_financial_results.csv", "text/csv")
-
-        st.download_button("📋 Download Executive Summary", f"# SC Agility — Executive Summary\n\n*{time.strftime('%Y-%m-%d %H:%M')}*\n\n{ex}", "sc_executive_summary.md", "text/markdown")
     except Exception as e:
         st.error(f"Export failed: {e}")
 
