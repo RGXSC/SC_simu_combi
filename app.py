@@ -156,7 +156,7 @@ def run_batch(params, progress_bar, status_text):
     return df
 
 
-def expand_financials(df_phys, price, var_cost, fixed_pcts, base_forecast, max_rows=3_000_000):
+def expand_financials(df_phys, price, var_cost, fixed_pcts, base_forecast, max_rows=1_000_000):
     n = len(fixed_pcts)
     df_s = df_phys.sample(max_rows//n, random_state=42) if len(df_phys)*n > max_rows else df_phys
     rows = []
@@ -447,7 +447,7 @@ with st.sidebar:
 
     with st.expander(f"📋 {len(stock_distribs)} distribution combos", expanded=False):
         sd_df = pd.DataFrame(stock_distribs, columns=['Stores %','Warehouse %','Semi %','Raw Mat %'])
-        st.dataframe(sd_df, hide_index=True, width='stretch', height=200)
+        st.dataframe(sd_df, hide_index=True, height=200)
     if len(stock_distribs) == 0:
         st.error("⚠️ No valid combos! Store + Warehouse + Semi must ≤ 100%")
         stock_distribs = [(100, 0, 0, 0)]
@@ -508,7 +508,7 @@ st.info(f"""
 # ════════════════════════════════════════════════════════════════
 # RUN
 # ════════════════════════════════════════════════════════════════
-if st.button("🚀 Run All Simulations", type="primary", use_container_width=True):
+if st.button("🚀 Run All Simulations", type="primary"):
     st.divider()
 
     st.subheader("Phase 1: Physical Simulations")
@@ -554,7 +554,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
 
     # ─── VISUAL REGRESSION TREE ───
     st.subheader("🌳 Decision Tree — What Drives Net Margin?")
-    st.pyplot(analysis['tree_fig'], use_container_width=True)
+    st.pyplot(analysis['tree_fig'])
     plt.close(analysis['tree_fig'])
 
     with st.expander("📝 Tree Rules (text)"):
@@ -577,8 +577,8 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
     imp_df = imp_df[imp_df['Forest Importance'] > 0.005]
     st.dataframe(imp_df.style.format({
         'Tree Importance': '{:.3f}', 'Forest Importance': '{:.3f}', 'Correlation': '{:+.3f}'
-    }).bar(subset=['Forest Importance'], color='#4a90d9'),
-        hide_index=True, width='stretch')
+    }),
+        hide_index=True)
 
     # ─── 2×2 STRATEGY MATRIX ───
     st.subheader("⚔️ Strategy Matrix: Stock Position × Supply Chain Speed")
@@ -600,7 +600,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
         fmt_matrix['Avg Total LT (wks)'] = fmt_matrix['Avg Total LT (wks)'].map(lambda x: f"{x:.0f}")
     if 'Avg % in Stores' in fmt_matrix.columns:
         fmt_matrix['Avg % in Stores'] = fmt_matrix['Avg % in Stores'].map(lambda x: f"{x:.0f}%")
-    st.dataframe(fmt_matrix, width='stretch')
+    st.dataframe(fmt_matrix)
 
     # ─── HEAD-TO-HEAD ───
     st.subheader("🏆 Head-to-Head: Push to Store+Slow vs Spread along SC+Fast")
@@ -629,7 +629,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                         'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_stk).set_index('Initial Stock (units)').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), width='stretch')
+    }))
 
     st.subheader("📊 Net Margin by % Stock in Stores")
     by_sp = []
@@ -641,7 +641,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                        'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_sp).set_index('% in Stores').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), width='stretch')
+    }))
 
     if df_full['pct_in_warehouse'].nunique() > 1:
         st.subheader("📊 Net Margin by % Stock in Warehouse")
@@ -654,7 +654,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
         st.dataframe(pd.DataFrame(by_wh).set_index('% in Warehouse').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-        }), width='stretch')
+        }))
 
     if df_full['pct_in_semifinished'].nunique() > 1:
         st.subheader("📊 Net Margin by % Stock in Semi-Finished")
@@ -667,7 +667,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
         st.dataframe(pd.DataFrame(by_se).set_index('% in Semi-Finished').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-        }), width='stretch')
+        }))
 
     st.subheader("📊 Net Margin by Total Lead Time")
     by_lt = []
@@ -679,7 +679,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                        'Wtd Avg Net Profit €': weighted_mean(g, 'net_profit')})
     st.dataframe(pd.DataFrame(by_lt).set_index('Total Lead Time (wks)').style.format({
         'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}', 'Wtd Avg Net Profit €':'€{:,.0f}'
-    }), width='stretch')
+    }))
 
     if len(demand_splits) > 1:
         st.subheader("📊 Net Margin by Demand Split (Store A %)")
@@ -691,7 +691,7 @@ if st.button("🚀 Run All Simulations", type="primary", use_container_width=Tru
                            'Wtd Avg Service Level': weighted_mean(g, 'service_level')})
         st.dataframe(pd.DataFrame(by_ds).set_index('Store A Demand %').style.format({
             'Wtd Avg Net Margin %':'{:.1%}', 'Wtd Avg Service Level':'{:.1%}'
-        }), width='stretch')
+        }))
 
     # ════════════════════════════════════════════════════════════
     # EXECUTIVE SUMMARY
